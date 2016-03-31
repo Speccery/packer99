@@ -11,6 +11,7 @@
 #	include <malloc.h>
 #endif
 #include <stdlib.h>
+#include <string.h>
 
 unsigned char *image = NULL;
 
@@ -41,25 +42,23 @@ unsigned get_word(char **p) {
 int main(int argc, char *argv[]) {
   char *filename = NULL; // "modded-basic.obj";
   int rom_size = 64*1024;
-  int min_addr_ref = 1 << 30;
-  int max_addr_ref = 0;
-  int min_addr_written = min_addr_ref;
-  int max_addr_written = 0;
   unsigned org = 0;
   FILE *f = NULL;
   int line_nr = 0;
   int argi;
   int offset=0;
   int next_offset=0;
+  int ignore = 0;
 
-  printf("packer99.exe written by Erik Piehl\n");
+  printf("packer99.exe written by Erik Piehl (C) 2016\n");
   if (argc < 4) {
   	fprintf(stderr, 
-  		"Usage: packer99 rom-file rom-size [[-o offset] ti-file]\n"
+  		"Usage: packer99 rom-file rom-size [-i] [[-o offset] ti-file]\n"
   		"\trom-file\tName of output binary file.\n"
   		"\trom-size\tSize of the ROM image in kilobytes\n"
-  		"\toffset\tOptional offset to add to all addresses from source\n"
-  		"\tti-file\tSource file in tagged TI format\n"
+  		"\t-i\t\tIgnore writes outside of ROM\n"
+  		"\t-o offset\tOptional offset to add to all addresses from source\n"
+  		"\tti-file\t\tSource file in tagged TI format\n"
   		"It is possible to have multiple t-files and offsets to write to the same ROM image.\n"
   		);
   	return 1;
@@ -80,8 +79,14 @@ int main(int argc, char *argv[]) {
       perror("malloc failed...?");
       exit(5);
   }
+  memset(image, 0xFF, rom_size);
   
   for(argi=3; argi<argc; argi++) {
+    int min_addr_ref = 1 << 30;
+    int max_addr_ref = 0;
+    int min_addr_written = min_addr_ref;
+    int max_addr_written = 0;
+
   	if (next_offset) {
   		next_offset = 0;
   		if(sscanf(argv[argi], "%d", &offset) != 1) {
@@ -96,91 +101,99 @@ int main(int argc, char *argv[]) {
   		next_offset = 1;
   		continue;
   	} 
+  	if (argv[argi][0] == '-' && argv[argi][1] == 'i') {
+  		// Turn on the flag to ignore writes above boundary.
+  		ignore = 1;
+  		continue;
+  	} 
   	
   	filename = argv[argi];
   
 	  f = fopen(filename, "rt");
 	  if (!image) {
-		char s[512];
-		sprintf(s, "Opening of %s failed.", filename);
-		free(image);
-		perror(s);
-		exit(6);
+			char s[512];
+			sprintf(s, "Opening of %s failed.", filename);
+			free(image);
+			perror(s);
+			exit(6);
 	  }
 	  printf("File: %s\n\tOffset=%d 0x%04X\n", filename, offset, offset);
 	  line_nr = 0;
 	  while(!feof(f)) {
-		char s[512];
-		char *p = s;
-		char c;
-		int val, go, checksum;
+			char s[512];
+			char *p = s;
+			char c;
+			int val, go, checksum;
 
-		if(!fgets(s, sizeof(s), f))
-			continue;
-		line_nr++;
+			if(!fgets(s, sizeof(s), f))
+				continue;
+			line_nr++;
 
-		go = 1;
-		while((c = *p++) && go) {	
-			switch(c) {
-				case '0': 
-					// Section size tag
+			go = 1;
+			while((c = *p++) && go) {	
+				switch(c) {
+					case '0': 
+						// Section size tag
+						val = get_word(&p);
+						printf("\tPSEG size %d\n", val);
+						p += 8; // skip the name
+					break;
+				case '9':
 					val = get_word(&p);
-					printf("\tPSEG size %d\n", val);
-					p += 8; // skip the name
-				break;
-			case '9':
-			  val = get_word(&p);
-			  // printf("AORG %04X\n", val);
-			  set_min( &min_addr_ref, val);
-			  set_max( &max_addr_ref, val);
-			  org = val;
-			  break;
-			case 'B':
-			  val = get_word(&p);
-			  set_min( &min_addr_written, org);
-			  set_max( &max_addr_written, org);
-			  if (org+offset > rom_size) {
-				fprintf(stderr, "org+offset address beoynd rom_size %04X > %04X\n", org, rom_size);
-				exit(5);
-			  }
-			  image[org+offset] = 0xFF & (val >> 8); // Big endian
-			  image[org+offset] = 0xFF & val;
-			  org += 2;
-			  break;
-			case 'F': 
-			  go = 0; // End of record
-			  break; 
-			case '7':
-			  {
-				checksum = 0;
-				char *t = s;
-				short int si;
-				while(t < p) 
-				  checksum += *t++;
+					// printf("AORG %04X\n", val);
+					set_min( &min_addr_ref, val);
+					set_max( &max_addr_ref, val);
+					org = val;
+					break;
+				case 'B':
+					val = get_word(&p);
+					set_min( &min_addr_written, org);
+					set_max( &max_addr_written, org);
+					if (org+offset > rom_size) {
+						fprintf(stderr, "Warning: org+offset address beoynd rom_size %04X > %04X\n", org, rom_size);
+						if (!ignore)
+							exit(5);
+					}
+					if (org+offset < rom_size-1) {
+						image[org+offset] = 0xFF & (val >> 8); // Big endian
+						image[org+offset+1] = 0xFF & val;
+					}
+					org += 2;
+					break;
+				case 'F': 
+					go = 0; // End of record
+					break; 
+				case '7':
+					{
+					checksum = 0;
+					char *t = s;
+					short int si;
+					while(t < p) 
+						checksum += *t++;
 
-				val = get_word(&p); // Fetch checksum value. It is a 16 bit signed value.
-				si = (short int)val;
-		  
-				if (checksum != -si) {
-					printf("Line %d: Checksum error %d, %d\n", line_nr, checksum, -si);
+					val = get_word(&p); // Fetch checksum value. It is a 16 bit signed value.
+					si = (short int)val;
+			
+					if (checksum != -si) {
+						printf("Line %d: Checksum error %d, %d\n", line_nr, checksum, -si);
+					}
+					}  
+					break;
+				case ':':
+					go = 0;
+					printf("\tReferenced memory locations: %04X - %04X\n" 
+						"\tWritten memory locations: %04X - %04X\n",
+						min_addr_ref, max_addr_ref, 
+						min_addr_written, max_addr_written);
+					printf("Processed %d lines.\n", line_nr);
+					break;
+				default:
+					printf("Unknown TAG %c, line %d, from %s\n",
+					c, line_nr, p);
+					exit(0);
+					break;
 				}
-			  }  
-			  break;
-			case ':':
-				go = 0;
-				printf("\tReferenced memory locations: %04X - %04X\n" 
-					"\tWritten memory locations: %04X - %04X\n",
-					min_addr_ref, max_addr_ref, 
-					min_addr_written, max_addr_written);
-				printf("Processed %d lines.\n", line_nr);
-				break;
-			default:
-			  printf("Unknown TAG %c, line %d, from %s\n",
-				c, line_nr, p);
-			  exit(0);
-			  break;
 			}
-		}
 	  }
 	  fclose(f);
 	} // for argi
