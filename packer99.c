@@ -3,7 +3,7 @@
 // 
 // Started 2016-03-30
 //
-
+//
 
 #define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
@@ -11,7 +11,6 @@
 #	include <malloc.h>
 #endif
 #include <stdlib.h>
-
 
 unsigned char *image = NULL;
 
@@ -40,10 +39,9 @@ unsigned get_word(char **p) {
 }
 
 int main(int argc, char *argv[]) {
-  // First let's start with hardcoded parameters
   char *filename = NULL; // "modded-basic.obj";
   int rom_size = 64*1024;
-  int min_addr_ref = 1024*1024;
+  int min_addr_ref = 1 << 30;
   int max_addr_ref = 0;
   int min_addr_written = min_addr_ref;
   int max_addr_written = 0;
