@@ -49,6 +49,7 @@ int main(int argc, char *argv[]) {
   int offset=0;
   int next_offset=0;
   int ignore = 0;
+  int warning_counter = 0;
 
   printf("packer99.exe written by Erik Piehl (C) 2016\n");
   if (argc < 4) {
@@ -150,7 +151,10 @@ int main(int argc, char *argv[]) {
 					set_min( &min_addr_written, org);
 					set_max( &max_addr_written, org);
 					if (org+offset > rom_size) {
-						fprintf(stderr, "Warning: org+offset address beoynd rom_size %04X > %04X\n", org, rom_size);
+						if(++warning_counter < 5)
+							fprintf(stderr, "Warning: org+offset address beoynd rom_size %04X > %04X\n", org, rom_size);
+						else if(warning_counter == 5)
+							fprintf(stderr, "Only 5 warnings reported\n");
 						if (!ignore)
 							exit(5);
 					}

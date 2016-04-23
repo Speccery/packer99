@@ -4,6 +4,7 @@ echo "Copying basic.obj and boot1.obj, producing rom3.bin"
 cp ~/Dropbox/Omat/Retro/TMS9900/Stuart/Modified\ Cortex\ BASIC/modded-basic.obj basic.obj
 cp ~/Dropbox/Omat/trunk/projects/bb95/DisSource.obj boot1.obj
 ./packer99 rom3.bin 32 boot1.obj -i basic.obj
+
 # Now we've got a functional ROM with EVMBUG and BASIC in the image "rom3.bin".
 # Next merge Forth into this image, by appending on top of 32K.
 # The Forth image starts at 0x1600 in the binary.
@@ -28,6 +29,10 @@ with open("padding.bin","wb") as file:
 file.close()
 eof-python
 
+# Get the "shell", ledit99.bin. This will in practice be in rom at 0xA000.
+echo "Copying ledit99.bin"
+cp ~/Dropbox/Omat/trunk/projects/bb95/ledit99.bin .
+
 # Finally package the whole thing.
-cat rom3.bin forth.bin padding.bin >  rom4.bin
+cat rom3.bin forth.bin padding.bin ledit99.bin >  rom4.bin
 echo "Created rom4.bin"
