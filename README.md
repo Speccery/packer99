@@ -11,6 +11,10 @@ Creates a 32 kbyte binary rom file "rom.bin" from tagged hex file boot.obj. The 
 `./packer99 rom.bin 32 boot.obj -i -o -27136 modded-basic.obj`
 The same as above, but also merges the file "modded-basic.obj" to the same image. It is possible to merge more than two files, just by adding more filenames. The current offset can be changed before each file, to build the ROM layout as necessary.
 
+After some further development, now also raw binary images can be merged, and a.out format files too. The offsets can now be given as hexadecimal numbers.
+
+`./packer99 rom7.bin 42 boot1.obj -i -t basic.obj -b -o 0x8000 forth.bin -a -o 0xa000 ../bb95/ledit99.out`
+
 ## General usage:
 ```  
 Ruutu:packer99 epiehl$ ./packer99
@@ -18,9 +22,14 @@ packer99.exe written by Erik Piehl (C) 2016
 Usage: packer99 rom-file rom-size [-i] [[-o offset] ti-file]
 	rom-file	Name of output binary file.
 	rom-size	Size of the ROM image in kilobytes
-	-i		    Ignore writes outside of ROM
+	-i		Ignore writes outside of ROM
 	-o offset	Optional offset to add to all addresses from source
-	ti-file		Source file in tagged TI format
-It is possible to have multiple t-files and offsets to write to the same ROM image.
+	-t		Next source file in tagged TI format
+	-b		Next source file is a pure binary file
+	-a		Next file in a.out format (16 byte header)
+	filename	Name of source file
+It is possible to have multiple files and offsets to write to the same ROM image.
+Offset can be decimal or hexadecimal, a minus sign can be prepended.
+Examples: -o 1430 -o -300 -o 0x8000 -o -0x100
 Ruutu:packer99 epiehl$
 ```
