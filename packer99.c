@@ -1,8 +1,10 @@
 // packer99.c
 // Written by Erik Piehl
+// Pack multiple source files into one binary image for TMS9900 processors.
 // 
 // Started 2016-03-30
-//
+// Continued on the night of 2016-04-26 by adding the ability to include
+// binary files and a.out files.
 //
 
 #define _CRT_SECURE_NO_WARNINGS
